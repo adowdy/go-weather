@@ -3,10 +3,10 @@ package main
 import (
 	// "fmt"
 	"encoding/json"
-	"net/http"
-	"strings"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"strings"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			json.NewEncoder(w).Encode(data)
 		})
-	
+
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -34,12 +34,12 @@ func hello(w http.ResponseWriter, r *http.Request) {
 }
 
 func query(city string) (weatherData, error) {
-	apiConfig, err := loadApiConfig(".apiConfig")
+	apiConfig, err := loadAPIConfig(".apiConfig")
 	if err != nil {
 		return weatherData{}, err
 	}
 
-	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapApiKey + "&q=" + city)
+	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapAPIKey + "&q=" + city)
 	if err != nil {
 		return weatherData{}, err
 	}
@@ -55,17 +55,17 @@ func query(city string) (weatherData, error) {
 	return d, nil
 }
 
-func loadApiConfig(filename string) (apiConfigData, error) {
+func loadAPIConfig(filename string) (apiConfigData, error) {
 	bytes, err := ioutil.ReadFile(filename)
 
 	if err != nil {
-		return apiConfigData {}, err
+		return apiConfigData{}, err
 	}
 
 	var c apiConfigData
 	err = json.Unmarshal(bytes, &c)
 	if err != nil {
-		return apiConfigData {}, err
+		return apiConfigData{}, err
 	}
 
 	return c, nil
@@ -79,23 +79,23 @@ type weatherData struct {
 }
 
 type apiConfigData struct {
-	OpenWeatherMapApiKey string `json:"OpenWeatherMapApiKey"`
-	WundergroundApiKey string `json:"WundergroundApiKey"`
+	OpenWeatherMapAPIKey string `json:"OpenWeatherMapApiKey"`
+	WundergroundAPIKey   string `json:"WundergroundApiKey"`
 }
 
 type weatherProvider interface {
-	temperature(city string) (float64, error)  // temperature in Kelvin!
+	temperature(city string) (float64, error) // temperature in Kelvin!
 }
 
-type openWeatherMap struct {}
+type openWeatherMap struct{}
 
 func (w openWeatherMap) temperature(city string) (float64, error) {
-	apiConfig, err := loadApiConfig(".apiConfig")
+	apiConfig, err := loadAPIConfig(".apiConfig")
 	if err != nil {
 		return 0, err
 	}
 
-	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapApiKey + "&q=" + city)
+	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapAPIKey + "&q=" + city)
 	if err != nil {
 		return 0, err
 	}
@@ -121,13 +121,13 @@ type weatherUnderground struct {
 }
 
 func (w weatherUnderground) temperature(city string) (float64, error) {
-	apiConfig, err := loadApiConfig(".apiConfig")
+	apiConfig, err := loadAPIConfig(".apiConfig")
 	if err != nil {
 		return 0, err
 	}
-	w.apiKey := apiConfig.WundergroundApiKey
+	myKey := apiConfig.WundergroundAPIKey
 
-	resp, err := http.Get("http://api.wunderground.com/api/" + w.apiKey + "/conditions/q/" + city + ".json")
+	resp, err := http.Get("http://api.wunderground.com/api/" + myKey + "/conditions/q/" + city + ".json")
 	if err != nil {
 		return 0, err
 	}
