@@ -10,8 +10,13 @@ import (
 )
 
 func main() {
+
+	// TO TELL IF SERVER ALIVE
+	// curl http://localhost:8081/hello
 	http.HandleFunc("/hello", hello)
 
+	// GET WEATHER OF A CITY
+	// curl http://localhost:8081/weather/phoenix
 	http.HandleFunc("/weather/",
 		func(w http.ResponseWriter, r *http.Request) {
 			city := strings.SplitN(r.URL.Path, "/", 3)[2]
@@ -26,7 +31,7 @@ func main() {
 			json.NewEncoder(w).Encode(data)
 		})
 
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8081", nil)
 }
 
 func hello(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +85,6 @@ type weatherData struct {
 
 type apiConfigData struct {
 	OpenWeatherMapAPIKey string `json:"OpenWeatherMapApiKey"`
-	WundergroundAPIKey   string `json:"WundergroundApiKey"`
 }
 
 type weatherProvider interface {
@@ -121,30 +125,34 @@ type weatherUnderground struct {
 }
 
 func (w weatherUnderground) temperature(city string) (float64, error) {
-	apiConfig, err := loadAPIConfig(".apiConfig")
-	if err != nil {
-		return 0, err
-	}
-	myKey := apiConfig.WundergroundAPIKey
 
-	resp, err := http.Get("http://api.wunderground.com/api/" + myKey + "/conditions/q/" + city + ".json")
-	if err != nil {
-		return 0, err
-	}
+	// PRETEND WEATHER UNDERGROUND STILL WORKS AND GIVES A TEMP
+	return 288.706, nil
 
-	defer resp.Body.Close()
+	// apiConfig, err := loadAPIConfig(".apiConfig")
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// myKey := apiConfig.WundergroundAPIKey
 
-	var d struct {
-		Observation struct {
-			Celsius float64 `json:"temp_c"`
-		} `json:"current_observation"`
-	}
+	// resp, err := http.Get("http://api.wunderground.com/api/" + myKey + "/conditions/q/" + city + ".json")
+	// if err != nil {
+	// 	return 0, err
+	// }
 
-	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
-		return 0, err
-	}
+	// defer resp.Body.Close()
 
-	kelvin := d.Observation.Celsius + 273.15
-	log.Printf("wunderGround: %s: %.2f", city, kelvin)
-	return kelvin, nil
+	// var d struct {
+	// 	Observation struct {
+	// 		Celsius float64 `json:"temp_c"`
+	// 	} `json:"current_observation"`
+	// }
+
+	// if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
+	// 	return 0, err
+	// }
+
+	// kelvin := d.Observation.Celsius + 273.15
+	// log.Printf("wunderGround: %s: %.2f", city, kelvin)
+	// return kelvin, nil
 }
