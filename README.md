@@ -1,6 +1,8 @@
 Took an existing Go template for grabbing weather and fixed it up. Just an attempt to sharpen up on my rusty Golang.
 
-Note - to anyone trying to run this, get your OpenWeatherMap API key from the site and paste the key into the .apiConfig-EXAMPLE template and rename that .apiConfig
+Also fooling around with crosscompiling and deploying to a raspberry pi, with scripts for that process.
+
+Note - to anyone trying to run this, get your OpenWeatherMap API key from the site and paste the key into the apiConfig-EXAMPLE template and rename that apiConfig
 
 ### Original wiki below
 

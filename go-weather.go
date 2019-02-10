@@ -38,7 +38,7 @@ func hello(w http.ResponseWriter, r *http.Request) {
 }
 
 func queryWeatherData(city string) (weatherDataJSON, error) {
-	apiConfig, err := loadAPIConfig(".apiConfig")
+	apiConfig, err := loadAPIConfig("apiConfig")
 	if err != nil {
 		return weatherDataJSON{}, err
 	}
@@ -93,7 +93,7 @@ type weatherProvider interface {
 type openWeatherMap struct{}
 
 func (w openWeatherMap) temperature(city string) (float64, error) {
-	apiConfig, err := loadAPIConfig(".apiConfig")
+	apiConfig, err := loadAPIConfig("apiConfig")
 	if err != nil {
 		return 0, err
 	}
