@@ -20,14 +20,15 @@ func main() {
 		func(w http.ResponseWriter, r *http.Request) {
 			city := strings.SplitN(r.URL.Path, "/", 3)[2]
 
-			data, err := queryWeatherData(city)
+			dataowm, datawu, err := queryWeatherData(city)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			json.NewEncoder(w).Encode(data)
+			json.NewEncoder(w).Encode(dataowm)
+			json.NewEncoder(w).Encode(datawu)
 		})
 
 	http.ListenAndServe(":8081", nil)
@@ -37,26 +38,40 @@ func hello(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello from Go!\n"))
 }
 
-func queryWeatherData(city string) (weatherDataJSON, error) {
+func queryWeatherData(city string) (weatherDataJSON, weatherDataJSON, error) {
 	apiConfig, err := loadAPIConfig("apiConfig")
 	if err != nil {
-		return weatherDataJSON{}, err
+		return weatherDataJSON{}, weatherDataJSON{}, err
 	}
 
-	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapAPIKey + "&q=" + city)
-	if err != nil {
-		return weatherDataJSON{}, err
-	}
+	owm := openWeatherMap{apiKey: apiConfig.OpenWeatherMapAPIKey}
+	wu := weatherUnderground{apiKey: apiConfig.WUndergroundAPIKey}
 
-	defer resp.Body.Close()
+	respOWM, err := owm.temperature(city)
+	respWU, err := wu.temperature(city)
 
-	var weatherDataBlob weatherDataJSON
+	// resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapAPIKey + "&q=" + city)
+	// if err != nil {
+	// 	return weatherDataJSON{}, err
+	// }
+	//defer resp.Body.Close()
 
-	if err := json.NewDecoder(resp.Body).Decode(&weatherDataBlob); err != nil {
-		return weatherDataJSON{}, err
-	}
+	// parse respOWM into this struct
+	var weatherDataBlobOWM weatherDataJSON
+	weatherDataBlobOWM.Name = city
+	weatherDataBlobOWM.Main.Kelvin = respOWM
 
-	return weatherDataBlob, nil
+	// parse respWU into this struct
+	var weatherDataBlobWU weatherDataJSON
+	weatherDataBlobWU.Name = city
+	weatherDataBlobWU.Main.Kelvin = respWU
+
+	// if err := json.NewDecoder(resp.Body).Decode(&weatherDataBlobOWM); err != nil {
+	// 	return weatherDataJSON{}, err
+	// }
+
+	//TODO will return 2 of weather data blobs
+	return weatherDataBlobOWM, weatherDataBlobWU, nil
 }
 
 func loadAPIConfig(filename string) (apiConfigData, error) {
@@ -84,21 +99,20 @@ type weatherDataJSON struct {
 
 type apiConfigData struct {
 	OpenWeatherMapAPIKey string `json:"OpenWeatherMapApiKey"`
+	WUndergroundAPIKey   string `json:"WUndergroundApiKey"`
 }
 
 type weatherProvider interface {
 	temperature(city string) (float64, error) // temperature in Kelvin!
 }
 
-type openWeatherMap struct{}
+type openWeatherMap struct {
+	apiKey string
+}
 
 func (w openWeatherMap) temperature(city string) (float64, error) {
-	apiConfig, err := loadAPIConfig("apiConfig")
-	if err != nil {
-		return 0, err
-	}
 
-	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapAPIKey + "&q=" + city)
+	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + w.apiKey + "&q=" + city)
 	if err != nil {
 		return 0, err
 	}
@@ -125,5 +139,5 @@ type weatherUnderground struct {
 func (w weatherUnderground) temperature(city string) (float64, error) {
 
 	// PRETEND WEATHER UNDERGROUND STILL WORKS AND GIVES A TEMP 60 deg F
-	return 288.706, nil
+	return 777.777, nil
 }
