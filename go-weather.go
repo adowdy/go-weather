@@ -27,6 +27,8 @@ func main() {
 			}
 
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			// TODO change this bit to resolve as proper json in firefox when displayed
+			// add comma, brackets to show blobs in a hierarchy
 			for _, providerBlob := range providerResults {
 				// send back a list of results
 				json.NewEncoder(w).Encode(providerBlob)
@@ -71,6 +73,7 @@ func loadAPIConfig(filename string) (apiConfigData, error) {
 	return c, nil
 }
 
+// TODO -- can i somehow SIMPLIFY 'weatherData' and just use weatherDataJson?
 type weatherDataJSON struct {
 	Name string `json:"name"`
 	Main struct {
@@ -91,6 +94,10 @@ type weatherProvider interface {
 }
 
 type openWeatherMap struct {
+	apiKey string
+}
+
+type weatherUnderground struct {
 	apiKey string
 }
 
@@ -137,7 +144,7 @@ func (mwp multiWeatherProvider) temperature(city string) ([]weatherDataJSON, err
 		}
 	}
 
-	// Return the average, same as before.
+	// pass up the list of provider results
 	return weatherDataBlobs, nil
 }
 
@@ -163,12 +170,13 @@ func (w openWeatherMap) temperature(city string) (weatherData, error) {
 	return weatherData{d.Main.Kelvin, "openWeatherMap"}, nil
 }
 
-type weatherUnderground struct {
-	apiKey string
-}
-
 func (w weatherUnderground) temperature(city string) (weatherData, error) {
 
-	// PRETEND WEATHER UNDERGROUND STILL WORKS AND GIVES A TEMP 60 deg F
+	// Weather Underground currently doesn't offer free API keys... give dummy data
 	return weatherData{777.777, "weatherUnderground"}, nil
 }
+
+// TODO -- add 'Dark Sky' weather data provider? takes GPS, would need gps -> city
+// https://darksky.net/dev/docs
+// reverse geocoding with google might do it
+// https://developers.google.com/maps/documentation/geocoding/intro#ReverseGeocoding
