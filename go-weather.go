@@ -20,15 +20,17 @@ func main() {
 		func(w http.ResponseWriter, r *http.Request) {
 			city := strings.SplitN(r.URL.Path, "/", 3)[2]
 
-			dataowm, datawu, err := queryWeatherData(city)
+			providerResults, err := queryWeatherData(city)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			json.NewEncoder(w).Encode(dataowm)
-			json.NewEncoder(w).Encode(datawu)
+			for _, providerBlob := range providerResults {
+				// send back a list of results
+				json.NewEncoder(w).Encode(providerBlob)
+			}
 		})
 
 	http.ListenAndServe(":8081", nil)
@@ -38,40 +40,19 @@ func hello(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello from Go!\n"))
 }
 
-func queryWeatherData(city string) (weatherDataJSON, weatherDataJSON, error) {
+func queryWeatherData(city string) ([]weatherDataJSON, error) {
 	apiConfig, err := loadAPIConfig("apiConfig")
 	if err != nil {
-		return weatherDataJSON{}, weatherDataJSON{}, err
+		return []weatherDataJSON{}, err
 	}
 
-	owm := openWeatherMap{apiKey: apiConfig.OpenWeatherMapAPIKey}
-	wu := weatherUnderground{apiKey: apiConfig.WUndergroundAPIKey}
+	mwp := multiWeatherProvider{
+		openWeatherMap{apiKey: apiConfig.OpenWeatherMapAPIKey},
+		weatherUnderground{apiKey: apiConfig.WUndergroundAPIKey},
+	}
 
-	respOWM, err := owm.temperature(city)
-	respWU, err := wu.temperature(city)
+	return mwp.temperature(city)
 
-	// resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + apiConfig.OpenWeatherMapAPIKey + "&q=" + city)
-	// if err != nil {
-	// 	return weatherDataJSON{}, err
-	// }
-	//defer resp.Body.Close()
-
-	// parse respOWM into this struct
-	var weatherDataBlobOWM weatherDataJSON
-	weatherDataBlobOWM.Name = city
-	weatherDataBlobOWM.Main.Kelvin = respOWM
-
-	// parse respWU into this struct
-	var weatherDataBlobWU weatherDataJSON
-	weatherDataBlobWU.Name = city
-	weatherDataBlobWU.Main.Kelvin = respWU
-
-	// if err := json.NewDecoder(resp.Body).Decode(&weatherDataBlobOWM); err != nil {
-	// 	return weatherDataJSON{}, err
-	// }
-
-	//TODO will return 2 of weather data blobs
-	return weatherDataBlobOWM, weatherDataBlobWU, nil
 }
 
 func loadAPIConfig(filename string) (apiConfigData, error) {
@@ -93,7 +74,8 @@ func loadAPIConfig(filename string) (apiConfigData, error) {
 type weatherDataJSON struct {
 	Name string `json:"name"`
 	Main struct {
-		Kelvin float64 `json:"temp"`
+		ProviderName string  `json:"providerName"`
+		Kelvin       float64 `json:"temp"`
 	} `json:"main"`
 }
 
@@ -102,19 +84,68 @@ type apiConfigData struct {
 	WUndergroundAPIKey   string `json:"WUndergroundApiKey"`
 }
 
+type multiWeatherProvider []weatherProvider
+
 type weatherProvider interface {
-	temperature(city string) (float64, error) // temperature in Kelvin!
+	temperature(city string) (weatherData, error) // temperature in Kelvin!
 }
 
 type openWeatherMap struct {
 	apiKey string
 }
 
-func (w openWeatherMap) temperature(city string) (float64, error) {
+type weatherData struct {
+	temp         float64
+	providerName string
+}
+
+func (mwp multiWeatherProvider) temperature(city string) ([]weatherDataJSON, error) {
+	// Make a channel for temperatures, and a channel for errors.
+	// Each provider will push a value into only one.
+	var weatherDataBlobs []weatherDataJSON
+	temps := make(chan weatherData, len(mwp))
+	errs := make(chan error, len(mwp))
+
+	// For each provider, spawn a goroutine with an anonymous function.
+	// That function will invoke the temperature method, and forward the response.
+	for _, provider := range mwp {
+		go func(p weatherProvider) {
+			wd, err := p.temperature(city)
+			if err != nil {
+				errs <- err
+				return
+			}
+			temps <- wd
+		}(provider)
+	}
+
+	// Collect a temperature or an error from each provider.
+	for i := 0; i < len(mwp); i++ {
+		select {
+		case temp := <-temps:
+			// new weather data json based on channel passed blob from provider
+			var blob weatherDataJSON
+			blob.Name = city
+			blob.Main.ProviderName = temp.providerName
+			blob.Main.Kelvin = temp.temp
+			// combine slices
+			weatherDataBlobs = append(weatherDataBlobs, blob)
+		case err := <-errs:
+			if err != nil {
+				return weatherDataBlobs, err
+			}
+		}
+	}
+
+	// Return the average, same as before.
+	return weatherDataBlobs, nil
+}
+
+func (w openWeatherMap) temperature(city string) (weatherData, error) {
 
 	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + w.apiKey + "&q=" + city)
 	if err != nil {
-		return 0, err
+		return weatherData{0, "openWeatherMap"}, err
 	}
 	defer resp.Body.Close()
 
@@ -125,19 +156,19 @@ func (w openWeatherMap) temperature(city string) (float64, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&d); err != nil {
-		return 0, err
+		return weatherData{0, "openWeatherMap"}, err
 	}
 
 	log.Printf("openWeatherMap: %s: %.2f", city, d.Main.Kelvin)
-	return d.Main.Kelvin, nil
+	return weatherData{d.Main.Kelvin, "openWeatherMap"}, nil
 }
 
 type weatherUnderground struct {
 	apiKey string
 }
 
-func (w weatherUnderground) temperature(city string) (float64, error) {
+func (w weatherUnderground) temperature(city string) (weatherData, error) {
 
 	// PRETEND WEATHER UNDERGROUND STILL WORKS AND GIVES A TEMP 60 deg F
-	return 777.777, nil
+	return weatherData{777.777, "weatherUnderground"}, nil
 }
